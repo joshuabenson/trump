@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta name="Author" content="Gerard Ferrandez at http://www.dhteumeuleu.com/">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="HandheldFriendly" content="true">
+<meta name="msvalidate.01" content="B6C713C1F4E407129EDEF7810A8B9BCB">
+<meta name="description" content="HTML5 projective transformation CSS 3D demo">
+<meta name="keywords" content="html5,3D,perspective,projective transformation">
+<link rel="canonical" href="http://www.dhteumeuleu.com/monsieur">
+<link rel="stylesheet" href="monsieur%20-%20HTML5%20CSS%203D%20Transform%20demo_files/slider.css">
+<link rel="shortcut icon" href="http://www.dhteumeuleu.com/favicon.ico">
+<title>monsieur - HTML5 CSS 3D Transform demo</title>
+<style>
+html {
+	overflow: hidden;
+	-ms-touch-action: none;
+	-ms-content-zooming: none;
+}
+body {
+	position: absolute;
+	margin: 0px;
+	padding: 0px;
+	background: #000;
+	width: 100%;
+	height: 100%;
+}
+#screen {
+	position: absolute;
+	left:0;
+	top:0;
+	width: 100%;
+	height: 100%;
+	cursor: pointer;
+	background: #000;
+	overflow:hidden;
+}
+#screen img {
+	position:absolute;
+	visibility:hidden;
+}
+
+#screen .in {
+	
+}
+
+</style>
+<script src="monsieur%20-%20HTML5%20CSS%203D%20Transform%20demo_files/ge1doot.js"></script>
+<script>
+/* =======================================================
+ *  ---- HTML5 CSS 3D  projective transformation demo ----
+ * script: Gerard Ferrandez - 4 January 2015
+ * Released under the MIT license
+ * http://www.dhteumeuleu.com/LICENSE.html
+ * ======================================================= */
+
+"use strict";
+
+(function () {
+	/* ==== definitions ==== */
+	var  pointer, scr, nw, nh, Xi = 0, Yi = 0, Zi = 0;
+	
+	var cameraView = {
+		x: 0,
+		y: 0,
+		z: 140,
+		rotation: 0,
+		upAngle: 0,
+		xcos: 0,
+		xsin: 0,
+		ycos: 0,
+		ysin: 0,
+		zoom: 0,
+		rotate: function (rotation, upAngle) {
+			this.rotation = rotation;
+			this.upAngle = upAngle;
+			this.xcos = Math.cos(rotation);
+			this.xsin = Math.sin(rotation);
+			this.ycos = Math.cos(upAngle);
+			this.ysin = Math.sin(upAngle);
+		}
+	}
+	
+	var Point = function (x, y, z) {
+		this.x = x;
+		this.y = y;
+		this.z = z;
+		this.X = 0;
+		this.Y = 0;
+	}
+	
+	Point.prototype.project = function () {
+		var x = this.x;
+		var y = this.y;
+		var z = this.z;
+		var tx = cameraView.xcos * x - cameraView.xsin * z;
+		var tz = cameraView.xsin * x + cameraView.xcos * z;
+		x = tx;
+		z = tz;
+		var ty = cameraView.ycos * y - cameraView.ysin * z;
+		tz = cameraView.ysin * y + cameraView.ycos * z;
+		y = ty;
+		z = tz;
+		this.X = nw * 0.5 + ((cameraView.z * ((x * cameraView.zoom) - cameraView.x) / (cameraView.z + z))) + cameraView.x;
+		this.Y = nh * 0.5 + ((cameraView.z * ((y * cameraView.zoom) - cameraView.y) / (cameraView.z + z))) + cameraView.y;
+	}
+	
+	var Polygon = function (points, id) {
+		this.points = [];
+		for (var i = 0, n = points.length; i < n; i++) {
+			this.points.push(listPoints.points[points[i]]);
+		}
+		this.img = new CSS3Dtransform(document.getElementById(id));
+	}
+	
+	Polygon.prototype.draw = function () {
+		var 
+			x0 = this.points[0].X,
+			y0 = this.points[0].Y,
+			x1 = this.points[1].X,
+			y1 = this.points[1].Y,
+			x2 = this.points[2].X,
+			y2 = this.points[2].Y,
+			x3 = this.points[3].X,
+			y3 = this.points[3].Y;
+			
+		if ((x1-x0)*(y2-y0) < (x2-x0)*(y1-y0)) {
+			this.img.elem.style.visibility = "hidden";
+		} else {
+			this.img.elem.style.visibility = "visible";
+			this.img.transform(x0, y0, x1, y1, x2, y2, x3, y3);
+		}
+	}
+	
+	var listPoints = {
+		points: [],
+		add: function (p) {
+			this.points.push(new Point(p[0], p[1], p[2]));
+		},
+		project: function () {
+			for (var i = 0, n = this.points.length; i < n; i++ ) {
+				this.points[i].project();
+			}
+		}
+	}
+	
+	var listPolygons = {
+		polygons: [],
+		add: function (points, id) {
+			this.polygons.push(new Polygon(points, id));
+		},
+		draw: function () {
+			for (var i = 0, n = this.polygons.length; i < n; i++ ) {
+				this.polygons[i].draw();
+			}
+		}
+	}
+	
+	var CSS3Dtransform = function (element) {
+		this.elem = element;
+		this.w = element.offsetWidth;
+		this.h = element.offsetHeight;
+		var t = ["transform", "msTransform", "MozTransform", "WebkitTransform", "OTransform"];
+		for (var test, i = 0; test = t[i++];) {
+			if (typeof document.body.style[test] != "undefined") {
+				this.CSSTransform = test;
+				break;
+			}
+		}
+		this.elem.style[this.CSSTransform+"Origin"] = "0 0";
+	}
+
+
+	CSS3Dtransform.prototype.transform = function (x1, y1, x2, y2, x3, y3, x4, y4) {
+		
+		// projective transformation
+		// reference: http://math.stackexchange.com/questions/296794/finding-the-transform-matrix-from-4-projected-points-with-javascript
+
+		var v0, v1, v2;
+		var m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16, m17, m18, m19, m20, m21, m22, m23;
+		var a0, a1, a2, a3, a4, a5, a6, a7, a8, b0, b1, b2, b3, b4, b5, b6, b7, b8;
+		v0  = (y2-y3)*x4+(x3-x2)*y4+(x2*y3-x3*y2);
+		v1  = (y3-y1)*x4+(x1-x3)*y4+(x3*y1-x1*y3);
+		v2  = (y1-y2)*x4+(x2-x1)*y4+(x1*y2-x2*y1);
+		m1  = (x1+x2+x3-y1-y2-2)*v1;
+		m2  = (x1-y1)*v1;
+		m3  = y2*(-v0-v1+v2);
+		m4  = (-x1+y1+y2)*(v0+v1);
+		m5  = -(y1+y2)*v0;
+		m6  = x1*v0;
+		m7  = (-x1+2)*v0;
+		m9  = -2*v0;
+		m11	= -v0-v1;
+		m12	= (-x3+2)*v1;
+		m13	= (x3-1)*v1;
+		m16	= -(-x3+y2+y3)*v2;
+		m17	= -(x3-y3)*v2;
+		m18 = (y2+y3)*v2;
+		a0  = m6;
+		a1  = m1+m4+m5+m6+m12; 
+		a2  = m6+m7+m9+m16+m18; 
+		a3  = m2+m3+m4+m6+m16+m17; 
+		a4  = m2+m4+m5+m6;
+		a5  = m16+m17+m18; 
+		a6  = m6+m7+m11+m12+m13; 
+		a7  = m12+m13;
+		a8  = m6+m7+m9+v2;
+		b0  = this.h;
+		b2  = -this.w*this.h;
+		b4  = -this.w;
+		m1  = (a0+a1+a2-a3-a4-a7-a8)*b4;
+		m2  = (a0-a3)*b4;
+		m3  = -a4*b4;
+		m4  = (-a0+a3+a4)*(b0+b4);
+		m5  = -(a3+a4)*b0;
+		m6  = a0*b0;
+		m7  = (-a0+a6+a7)*(b0-b2);
+		m8  = (-a0+a6)*b2;
+		m9  = (a6+a7)*(-b0+b2);
+		m11 = a7*b2;
+		m15 = (a7+a8)*b4;
+		m19 = a1*b0;
+		m20 = a5*b4;
+		m21 = a3*b2;
+		a8  = m6+m7+m8+m9;
+		a0  = (m6+m19)/a8;
+		a1  = (m1+m4+m5+m6+m15)/a8;
+		a2  = (m6+m7+m9)/a8;
+		a3  = (m2+m3+m4+m6)/a8;
+		a4  = (m2+m4+m5+m6+m20)/a8;
+		a5  = m21/a8;
+		a6  = (m6+m7+m8+m11)/a8;
+		a7  = m15/a8;
+		var t = "matrix3d(" + 
+			a0 + ", " + a3 + ", 0, " + a6 + ", " +
+			a1 + ", " + a4 + ", 0, " + a7 + ", 0, 0, 1, 0, " +
+			a2 + ", " + a5 + ", 0, 1)";
+		this.elem.style[this.CSSTransform] = t;
+	}
+
+	// ---- init section ----
+	var init = function (param) {
+		// ---- init screen ----
+		scr = new ge1doot.Screen({
+			container: "screen",
+			resize: function () {
+				nw = scr.width;
+				nh = scr.height;
+				cameraView.zoom = nw / 170;
+			}
+		});
+		scr.resize();
+		// ---- init pointer ----
+		pointer = new ge1doot.Pointer({
+
+		});
+		// ---- init param ----
+		for (var i = 0; i < param.points.length; i++) {
+			listPoints.add(param.points[i]);
+		}
+		for (var i = 0; i < param.poly.length; i++) {
+			listPolygons.add(param.poly[i][0], param.poly[i][1]);
+		}
+		
+		// ---- start ----
+		cameraView.rotate(0, 0);
+		run();
+	}
+	
+	// ---- main loop ----
+	var run = function () {
+		Xi += (pointer.Xi - Xi) / 10;
+		Yi += (pointer.Yi - Yi) / 10;
+		cameraView.rotate(Zi + Xi / 100, Zi / 4 + Yi / 100);
+		listPoints.project();
+		listPolygons.draw();
+		Zi += 0.01;
+		requestAnimFrame(run);
+	};
+	
+	return {
+		// --- load data ----
+		load : function (p) {
+			window.addEventListener('load', function () {
+				init(p);
+			}, false);
+		}
+	}
+})().load({
+	points: [
+		[-80,-80,80],[80,-80,80],[80,80,80],[-80,80,80],[-80,-80,-80],[80,-80,-80],[80,80,-80],[-80,80,-80],
+		[-15,-15,15],[15,-15,15],[15,15,15],[-15,15,15],[-15,-15,-15],[15,-15,-15],[15,15,-15],[-15,15,-15]
+	],
+	poly: [
+		[[0, 1, 2, 3], "i1"],[[1, 5, 6, 2], "i2"],[[4, 0, 3, 7], "i3"],[[5, 4, 7, 6], "i4"],[[7, 3, 2, 6], "i5"],[[5, 1, 0, 4], "i6"],
+		[[9, 8, 11, 10], "i7"],[[13, 9, 10, 14], "i8"],[[8, 12, 15, 11], "i9"],[[12, 13, 14, 15], "i10"],[[14, 10, 11, 15], "i11"],[[12, 8, 9, 13], "i12"]
+	]
+});
+		
+</script>
+<script src="monsieur%20-%20HTML5%20CSS%203D%20Transform%20demo_files/ga.js" async=""></script></head>
+<body>
+<div id="screen">
+	<img style="transform-origin: 0px 0px 0px; visibility: visible; transform: matrix3d(-1.41026, 0.157915, 0, 0.0000825423, -0.695976, 0.418483, 0, -0.00108746, 0, 0, 1, 0, 1111.58, -475.011, 0, 1);" id="i1" class="in" src="monsieur%20-%20HTML5%20CSS%203D%20Transform%20demo_files/trump.jpg" alt="">
+	<img style="transform-origin: 0px 0px 0px; visibility: visible; transform: matrix3d(0.6096, 1.37493, 0, 0.000718679, -0.656781, 0.394915, 0, -0.00102622, 0, 0, 1, 0, 86.7826, -340.517, 0, 1);" id="i2" class="in" src="monsieur%20-%20HTML5%20CSS%203D%20Transform%20demo_files/trump.jpg" alt="">
+	<img style="transform-origin: 0px 0px 0px; visibility: visible; transform: matrix3d(-0.416596, -0.939617, 0, -0.00049114, -0.448839, 0.269882, 0, -0.000701311, 0, 0, 1, 0, 1018.06, 373.005, 0, 1);" id="i3" class="in" src="monsieur%20-%20HTML5%20CSS%203D%20Transform%20demo_files/trump.jpg" alt="">
+	<img style="transform-origin: 0px 0px 0px; visibility: visible; transform: matrix3d(0.875781, -0.0980658, 0, -0.0000512592, -0.432205, 0.25988, 0, -0.00067532, 0, 0, 1, 0, 347.145, 430.083, 0, 1);" id="i4" class="in" src="monsieur%20-%20HTML5%20CSS%203D%20Transform%20demo_files/trump.jpg" alt="">
+	<img style="transform-origin: 0px 0px 0px; visibility: hidden; transform: matrix3d(3.97662, -2.66256, 0, 0.00627356, -7.5172, 0.0118528, 0, -0.0000279278, 0, 0, 1, 0, 3563.64, -432.821, 0, 1);" id="i5" class="in" src="monsieur%20-%20HTML5%20CSS%203D%20Transform%20demo_files/trump.jpg" alt="">
+	<img style="transform-origin: 0px 0px 0px; visibility: visible; transform: matrix3d(-0.401157, -0.904794, 0, -0.000472938, 0.815966, -0.091368, 0, -0.0000477583, 0, 0, 1, 0, 347.145, 430.083, 0, 1);" id="i6" class="in" src="monsieur%20-%20HTML5%20CSS%203D%20Transform%20demo_files/trump.jpg" alt="">
+	<img style="transform-origin: 0px 0px 0px; visibility: visible; transform: matrix3d(0.288579, -0.0323137, 0, -0.0000168905, -0.142416, 0.0856332, 0, -0.000222525, 0, 0, 1, 0, 520.041, 166.593, 0, 1);" id="i7" src="monsieur%20-%20HTML5%20CSS%203D%20Transform%20demo_files/trump.jpg" alt="">
+	<img style="transform-origin: 0px 0px 0px; visibility: hidden; transform: matrix3d(0.121064, -0.0965782, 0, 0.000257707, -0.100296, -0.303527, 0, -0.000156712, 0, 0, 1, 0, 538.907, 478.228, 0, 1);" id="i8" src="monsieur%20-%20HTML5%20CSS%203D%20Transform%20demo_files/trump.jpg" alt="">
+	<img style="transform-origin: 0px 0px 0px; visibility: hidden; transform: matrix3d(0.158619, 0.299457, 0, 0.000149418, -0.146606, 0.0796533, 0, -0.000229072, 0, 0, 1, 0, 725.143, 137.793, 0, 1);" id="i9" src="monsieur%20-%20HTML5%20CSS%203D%20Transform%20demo_files/trump.jpg" alt="">
+	<img style="transform-origin: 0px 0px 0px; visibility: hidden; transform: matrix3d(0.0466187, -0.195004, 0, 0.000166381, -0.141908, -0.234654, 0, -0.000221732, 0, 0, 1, 0, 552.401, 478.216, 0, 1);" id="i10" src="monsieur%20-%20HTML5%20CSS%203D%20Transform%20demo_files/trump.jpg" alt="">
+	<img style="transform-origin: 0px 0px 0px; visibility: visible; transform: matrix3d(-0.140624, -0.317172, 0, -0.000165787, 0.286034, -0.0320287, 0, -0.0000167415, 0, 0, 1, 0, 537.341, 477.237, 0, 1);" id="i11" src="monsieur%20-%20HTML5%20CSS%203D%20Transform%20demo_files/trump.jpg" alt="">
+	<img style="transform-origin: 0px 0px 0px; visibility: hidden; transform: matrix3d(-0.238199, -0.106724, 0, -0.000253066, 0.207137, -0.0282503, 0, -0.0000669876, 0, 0, 1, 0, 570.556, 420.728, 0, 1);" id="i12" src="monsieur%20-%20HTML5%20CSS%203D%20Transform%20demo_files/trump.jpg" alt="">
+</div>
+<!-- dhteumeuleu nav menu -->
+<div id="nav">
+	<input checked="checked" name="nav-switch" id="nav-switch" type="checkbox">
+	<label class="label" for="nav-switch">
+		<div class="container">
+			<div class="nav-on">
+				<ul class="menu">
+					<li class="home"><a href="http://www.dhteumeuleu.com/index">Home</a></li>
+					<li class="list"><a href="http://www.dhteumeuleu.com/monsieur/source">Source</a></li>
+					<li class="arrow back"><a href="http://www.dhteumeuleu.com/the-warehouse">Prev</a></li>				</ul>
+			</div>
+			<div class="nav-off">
+				<div id="icon"><div></div><div></div></div>
+				<h1 class="title">monsieur</h1>
+			</div>
+		</div>
+	</label>
+</div> 
+<!-- end of dhteumeuleu nav menu -->
+<!-- google analytics -->
+<script>
+if (window.location.hostname.indexOf("dhteumeuleu") != -1) {
+	var _gaq = [["_setAccount", "UA-12394130-1"], ["_trackPageview"]];
+	(function() {
+		var ga = document.createElement("script"); ga.async = true;
+		ga.src = "http://www.google-analytics.com/ga.js";
+		(document.getElementsByTagName("head")[0]).appendChild(ga);
+	})();
+}
+</script>
+
+</body></html>
